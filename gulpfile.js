@@ -1,3 +1,6 @@
+
+const browser_port = 3000;
+
 const { src, dest, watch, parallel, series } = require("gulp");
 const fileinclude = require("gulp-file-include");
 const browsersync = require("browser-sync").create();
@@ -12,7 +15,7 @@ const rename = require("gulp-rename");
 const replace = require("gulp-replace");
 const uglify = require("gulp-uglify");
 const notify = require("gulp-notify");
-const plumber = require("gulp-plumber");
+const plumber = require('gulp-plumber');
 // Variables
 const path = {
   src: {
@@ -37,7 +40,7 @@ function browserSync() {
     server: {
       baseDir: "dist",
     },
-    port: 3000,
+    port: browser_port,
     notify: false,
   });
 }
@@ -51,12 +54,19 @@ function processHTML() {
     .pipe(dest(path.dist.html));
 }
 
+ function processFonts() {
+   return src(path.src.fonts)
+     .pipe(dest(path.dist.fonts))
+     .pipe(browsersync.stream());
+ }
+
 function processCSS() {
   return src(path.src.css)
     .pipe(dest(path.dist.css))
     .pipe(postcss([autoprefixer(), cssnano()]))
     .pipe(rename({ extname: ".min.css" }))
-    .pipe(dest(path.dist.css));
+    .pipe(dest(path.dist.css))
+    .pipe(browsersync.stream());
 }
 
 function processSCSS() {
@@ -66,7 +76,8 @@ function processSCSS() {
     .pipe(dest(path.dist.css))
     .pipe(postcss([autoprefixer(), cssnano()]))
     .pipe(rename({ extname: ".min.css" }))
-    .pipe(dest(path.dist.css));
+    .pipe(dest(path.dist.css))
+    .pipe(browsersync.stream());
 }
 
 function catchErr(e) {
@@ -81,9 +92,9 @@ function processJS() {
     .pipe(dest(path.dist.js))
     .pipe(uglify())
     .pipe(rename({ extname: ".min.js" }))
-    .pipe(dest(path.dist.js));
+    .pipe(dest(path.dist.js))
+    .pipe(browsersync.stream());
 }
-
 // Images Tasks
 
 function processImages() {
@@ -96,23 +107,30 @@ function processImages() {
         optimizationLevel: 3, // 0 to 7
       })
     )
-    .pipe(dest(path.src.img));
+    .pipe(dest(path.dist.img));
 }
-// Watch Task
 
 function watchFiles() {
-  parallel(
-    watch(path.src.html).on("change", browsersync.reload()),
-    watch(path.src.css).on("change", browsersync.stream()),
-    watch(path.src.scss).on("change", browsersync.stream()),
-    watch(path.src.js).on("change", browsersync.stream()),
-    watch(path.src.img).on("change", browsersync.stream())
-  );
+  browserSync();
+  watch(path.src.scss, processSCSS);
+  watch(path.src.css, processCSS);
+  watch(path.src.js, processJS);
+  watch(path.src.fonts, processFonts);
+  watch(path.src.img, processImages);
+  watch(path.src.html, processHTML).on("change", browsersync.reload);
 }
 
-// Default Task
-
-exports.default = series(
-  parallel(processHTML, processCSS, processSCSS, processJS, processImages),
-  series(browserSync, watchFiles)
+exports.default = parallel(
+  series(
+    processHTML, 
+    processCSS, 
+    processSCSS,
+    processJS,
+    processFonts,
+    processImages
+    ),
+    watchFiles
 );
+
+
+exports.watch = watchFiles;
